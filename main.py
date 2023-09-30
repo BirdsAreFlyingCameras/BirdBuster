@@ -3,11 +3,17 @@ import re
 import socket as s
 import threading as t
 from concurrent.futures import ThreadPoolExecutor
+from PyEnhance import Loading, Counter
+Loading = Loading.Loading
 
 PostiveStatusCodes = [200, 201, 202, 203, 204, 205, 206,
                       300, 301, 302, 303, 304, 305, 307,
                       308, 401]
 DirsChecked = []
+
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+}
 
 
 def main():
@@ -32,7 +38,8 @@ def main():
         global TLDS
 
         TLDSs = "https://data.iana.org/TLD/tlds-alpha-by-domain.txt"
-        response = r.get(TLDSs)
+        print("getting TLDSs")
+        response = r.get(TLDSs, headers=headers)
         response.raise_for_status()
 
         # The file uses line breaks for each TLD, and we filter out comments which start with '#'
@@ -215,17 +222,19 @@ def main():
 
     ListChoiceFunc()
 
-
-
+    ListCounter = Counter.Counter
 
     def Bust(i):
         lock = t.Lock()
         lock.acquire()
-
+        global ListLen
+        ListLen = len(List)
         try:
+            print('test')
 
             for Dir in List:
-
+                ListCounter.Add()
+                Loading.Stats(List=List, ListCounter=ListCounter)
                 if Dir in DirsChecked:
                     continue
 
@@ -234,17 +243,20 @@ def main():
 
                 FURL = f'{URLHTTP}/{Dir}'
 
-                Request = r.get(FURL)
+                Request = r.get(FURL, headers=headers)
 
                 if Request.status_code in PostiveStatusCodes:
-                    print(f'/{Dir} Returned status code {str(Request.status_code)}')
+                    print(f'\r/{Dir} Returned status code {str(Request.status_code)}')
+
         finally:
             lock.release()
 
-    Bust(ThreadCount)
-    thread_pool = ThreadPoolExecutor(max_workers=3000)
 
-    for i in range(len(List)):
+    Bust(ThreadCount)
+
+    thread_pool = ThreadPoolExecutor(max_workers=ThreadCount)
+
+    for i in range(ThreadCount):
         thread_pool.submit(Bust, i)
 
     thread_pool.shutdown(wait=True)
